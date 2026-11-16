@@ -1,0 +1,12 @@
+type,id,side,notional,tenor,maturity,rate,price
+# Sample positions priced by mcb_report (illustrative instruments and prices - not market quotes).
+# Edit freely and rerun: rates are in percent and prices are clean prices per 100 face.
+#   OIS  SOFR swap from spot. side = PAY or RECEIVE (the fixed rate). Needs: tenor and rate.
+#   UST  Treasury note or bond. side = LONG or SHORT. Needs: maturity and rate (the coupon).
+#        Add a price to get the yield and the rich/cheap gap and spreads against the curves.
+OIS,PAY-2Y,PAY,25000000,2Y,,4.75,
+OIS,PAY-5Y,PAY,10000000,5Y,,4.50,
+OIS,REC-10Y,RECEIVE,10000000,10Y,,5.00,
+UST,NOTE-2031,LONG,10000000,,2031-11-15,4.875,
+UST,NOTE-2036,LONG,10000000,,2036-11-15,5.125,99.75
+UST,BOND-2056,SHORT,5000000,,2056-11-15,5.375,

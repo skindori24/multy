@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multicurve bootstrap dashboard</title>
+<meta name="description" content="Yield curves bootstrapped from live market quotes, prices and risk for swaps and bonds, and return forecasts with bootstrap uncertainty bands.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <div class="row">
+      <div>
+        <h1>Multicurve bootstrap: curves, prices, risk and forecasts</h1>
+        <div class="meta" id="meta">Loading results&hellip;</div>
+      </div>
+      <button class="theme-toggle" id="theme" type="button" aria-label="Switch colour theme">Theme: auto</button>
+    </div>
+    <p class="disclaimer"><strong>Read this first.</strong> <span id="disclaimer">This is the output of a C++ course project. The signals are mechanical results of stated rules applied to public end-of-day data. They ignore transaction costs, liquidity, taxes and your own situation, and they are not investment advice.</span></p>
+  </div>
+</header>
+
+<nav class="sections" aria-label="Sections">
+  <div class="wrap">
+    <a href="#overview">Overview</a>
+    <a href="#usd">USD curves</a>
+    <a href="#forecast">Forecast</a>
+    <a href="#paper">Paper replication</a>
+    <a href="#eur">EUR multicurve</a>
+    <a href="#moex">Moscow Exchange</a>
+    <a href="#validation">Validation</a>
+    <a href="#method">Method</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<section id="overview">
+  <h2>Today at a glance</h2>
+  <p class="lede">A C++ engine does three things here. It <strong>bootstraps discount curves</strong> from today's market quotes, it <strong>prices swaps and bonds</strong> off those curves and measures their risk, and it <strong>resamples sixty years of yield-curve history</strong> (the Crump&ndash;Gospodinov bootstrap) to attach honest uncertainty to return forecasts. The page is rebuilt automatically from public end-of-day data.</p>
+  <div class="tiles" id="tiles"></div>
+
+  <h3>Trade signals</h3>
+  <div class="table-card" id="signals"></div>
+  <div class="callout" id="signal-rules"></div>
+
+  <h3>Data behind this page</h3>
+  <div class="table-card" id="sources"></div>
+</section>
+
+<section id="usd">
+  <h2>US dollar curves: SOFR swaps and Treasuries</h2>
+  <p class="lede">Two curves are bootstrapped each day: the SOFR curve from par swap rates (the risk-free curve used to discount collateralised derivatives) and the Treasury curve from the government's par yields. Bootstrapping means solving, one maturity at a time, for the discount factors that make every quoted instrument reprice exactly. A zero rate is the yield of a single payment at that maturity; a forward rate is the rate the curve lets you lock in today for a future period.</p>
+  <div class="grid two">
+    <div id="usd-zero"></div>
+    <div id="usd-fwd"></div>
+  </div>
+  <div class="grid two">
+    <div id="usd-hist"></div>
+    <div id="usd-spread"></div>
+  </div>
+
+  <h3>Market quotes and what the curves imply</h3>
+  <div class="grid two">
+    <div><div class="table-card" id="usd-sofr-table"></div><p class="table-note" id="usd-sofr-note"></p></div>
+    <div><div class="table-card" id="usd-tsy-table"></div><p class="table-note" id="usd-tsy-note"></p></div>
+  </div>
+  <div class="grid two">
+    <div><div class="table-card" id="usd-fwdswaps"></div><p class="table-note">A forward-starting swap rate such as 5Y5Y is the 5-year rate, 5 years from now, that today's curve lets you lock in. It is a break-even level, not a forecast.</p></div>
+    <div><div class="table-card" id="usd-spreads-table"></div><p class="table-note">Swap spread = SOFR swap rate minus the Treasury yield of the same maturity. The z-score compares today's spread with its own recent history; it flags unusual levels, it does not predict a reversal.</p></div>
+  </div>
+
+  <h3>Sample portfolio: prices and risk</h3>
+  <p class="lede">These positions come from <code>data/portfolio/usd_portfolio.csv</code> (illustrative instruments, edit the file and rerun to price your own). Swaps are valued on the SOFR curve, bonds on the Treasury curve. DV01 is the gain or loss for a one basis point rise in rates.</p>
+  <div class="table-card" id="usd-portfolio"></div>
+  <div class="grid two">
+    <div id="usd-risk-swaps"></div>
+    <div id="usd-risk-bonds"></div>
+  </div>
+</section>
+
+<section id="forecast">
+  <h2>Where could yields go? Forecasts with honest uncertainty</h2>
+  <p class="lede">Starting from today's Treasury curve, the engine simulates thousands of future curve paths by re-drawing blocks of historical yield-curve "news" (the Crump&ndash;Gospodinov bootstrap). The spread of those paths is the uncertainty; nothing here is a point prediction.</p>
+  <div class="callout"><strong>Do yield curves tell you the expected return?</strong> Only partly. A zero-coupon yield is the return you earn if you hold the bond to maturity. The forward curve is the path of rates at which you would break even, but forwards also contain a risk premium, so on average they have overstated future short rates. That is why the charts below show two lines: what forwards imply, and where history says rates tend to end up.</div>
+  <div class="grid three" id="fc-fans"></div>
+  <div class="grid two">
+    <div id="fc-short"></div>
+    <div id="fc-returns"></div>
+  </div>
+  <h3>One-year excess returns by maturity</h3>
+  <div class="table-card" id="fc-table"></div>
+  <p class="table-note" id="fc-note"></p>
+</section>
+
+<section id="paper">
+  <h2>Replicating the paper: do forward rates predict future rates?</h2>
+  <p class="lede">Crump and Gospodinov, <em>Deconstructing the Yield Curve</em> (New York Fed Staff Report 884), show that standard regressions on bond data give misleading p-values, and propose resampling "difference returns" instead of yields. Section 4.2 of the paper tests the expectations hypothesis, under which every slope below would equal 1. The engine re-runs those tests on the Fed's yield history up to the latest complete quarter.</p>
+  <div class="tiles" id="paper-tiles"></div>
+  <div id="paper-history"></div>
+  <h3>Four ways to run the same test give four different answers</h3>
+  <p class="lede">Each panel shows the estimated slope by bond maturity and the range of estimates across bootstrap histories. All panels share one scale, as in Figure 4 of the paper, so the differences in precision are visible: the Campbell&ndash;Shiller yield-change test (CS2) is wildly imprecise, the paper's CG test is tight and stable.</p>
+  <div class="grid three" id="paper-eh"></div>
+  <div class="table-card" id="paper-table"></div>
+  <p class="table-note">p-values are bootstrap p-values (symmetric percentile-t, Newey&ndash;West standard errors). A small p-value for "slope = 1" rejects the expectations hypothesis; a small p-value for "slope = 0" says forwards do contain information about future rates.</p>
+</section>
+
+<section id="eur">
+  <h2>EUR multicurve: one discount curve, one projection curve per tenor</h2>
+  <p class="lede">Since 2008 a 6-month Euribor loan carries more credit and liquidity risk than rolling overnight money, so one curve can no longer do every job. Collateralised swaps are discounted on the overnight (OIS) curve, while each Euribor tenor gets its own projection curve, bootstrapped with OIS discounting held fixed. Free live EUR swap quotes do not exist, so this part runs on a frozen market snapshot (11 December 2012) and is checked against QuantLib.</p>
+  <div class="grid two">
+    <div id="eur-zero"></div>
+    <div id="eur-fwd"></div>
+  </div>
+  <div class="grid two">
+    <div>
+      <h3>Agreement with QuantLib on the same inputs</h3>
+      <div class="table-card" id="eur-ql"></div>
+    </div>
+    <div>
+      <h3>Speed of the real-time layer</h3>
+      <div class="table-card" id="eur-latency"></div>
+      <p class="table-note">A tick re-solves only what the quote can affect: the curve that uses it, from its pillar onwards, and any curve discounted on it.</p>
+    </div>
+  </div>
+  <h3>A worked risk example</h3>
+  <div class="tiles" id="eur-risk-tiles"></div>
+  <div id="eur-risk"></div>
+  <details class="more"><summary>All 90 bootstrap instruments and their repricing errors</summary><div class="table-card" id="eur-instruments"></div></details>
+</section>
+
+<section id="moex">
+  <h2>Moscow Exchange: government bonds against the G-curve</h2>
+  <p class="lede">The exchange publishes an official zero-coupon curve for Russian government bonds (the G-curve). Every fixed-coupon OFZ is priced off that curve; the gap between its market price and its curve price, measured as a spread, shows whether the bond is cheap or rich. Because low-coupon and long bonds trade at systematically different spreads, each bond is compared with bonds of similar coupon and duration.</p>
+  <div id="moex-curve"></div>
+  <h3>Bond by bond</h3>
+  <div class="table-card" id="moex-table"></div>
+  <p class="table-note" id="moex-note"></p>
+  <h3>What rate futures imply</h3>
+  <div class="grid two">
+    <div class="table-card" id="moex-futures"></div>
+    <div class="table-card" id="moex-implied"></div>
+  </div>
+</section>
+
+<section id="validation">
+  <h2>Validation report</h2>
+  <p class="lede">A curve engine is tested by checking that it reprices the market and matches trusted references, not by whether its forecasts come true. These checks are recomputed on every run from the same data as the rest of the page.</p>
+  <div class="table-card" id="validation-table"></div>
+</section>
+
+<section id="method">
+  <h2>Method notes</h2>
+  <div class="card">
+    <p><strong>Two different "bootstraps".</strong> <em>Curve bootstrapping</em> takes today's quotes and solves for discount factors, with no randomness and no history. <em>Statistical bootstrapping</em> takes a long history of finished curves and resamples it to measure uncertainty. This project does both: the first produces the curves, the second produces the forecast bands and p-values.</p>
+    <p><strong>What a signal means.</strong> Treasury signals compare buying a bond for a year against holding a one-year bill, using the simulated distribution of returns and a regression on the curve's shape. Bond-by-bond signals compare each bond's spread with similar bonds. Both are relative, rule-based and uncertain; the bands on this page are wide because the true uncertainty is wide.</p>
+    <p><strong>What is not modelled.</strong> Intraday prices (all data is end of day), bid-offer costs, funding and repo, taxes, individual US Treasury issues (only the par curve is public), and any guarantee that history repeats.</p>
+    <p>Source code, tests and build instructions are in the project repository (see the README).</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    Data: Eris Innovations (SOFR swap curve), US Treasury, Federal Reserve Board (GSW yield curve), Federal Reserve Bank of New York, Moscow Exchange ISS. Reference implementation used for validation: QuantLib.
+  </div>
+</footer>
+
+<script src="data/results.js"></script>
+<script src="assets/charts.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
