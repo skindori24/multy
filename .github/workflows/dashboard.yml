@@ -1,0 +1,83 @@
+name: Build, test and publish the dashboard
+
+# Builds the C++ engine, runs the unit tests, downloads the latest public
+# market data, regenerates the results and publishes the dashboard to GitHub
+# Pages.  Runs on every push to main, on a schedule after the markets close,
+# and on demand from the Actions tab.
+#
+# One-time setup: repository Settings -> Pages -> Build and deployment ->
+# Source: "GitHub Actions".
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # 02:30 UTC Tuesday-Saturday: the previous US trading day is fully published.
+    - cron: "30 2 * * 2-6"
+    # 16:30 UTC Monday-Friday: after the Moscow close, picks up same-day MOEX data.
+    - cron: "30 16 * * 1-5"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Eigen (optional, CMake downloads it otherwise)
+        run: sudo apt-get update && sudo apt-get install -y libeigen3-dev || true
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build -j 4
+
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure
+
+      # Keeps the last successfully downloaded files, so a source that is
+      # temporarily unreachable shows yesterday's data instead of nothing.
+      - name: Restore previously downloaded market data
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: market-data-${{ github.run_id }}
+          restore-keys: market-data-
+
+      - name: Download market data
+        run: bash scripts/fetch_data.sh data/raw
+
+      - name: Run the engine
+        run: ./build/mcb_report --data data/raw --out site/data
+
+      - name: Latency benchmark
+        run: ./build/mcb_bench data/reference/eur_20121211.csv 300
+
+      - name: Upload the site
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
